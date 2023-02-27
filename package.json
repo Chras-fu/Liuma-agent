@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "adbkit": "^2.11.1",
+    "commander": "^2.19.0",
+    "usbmux": "^0.1.0"
+  }
+}

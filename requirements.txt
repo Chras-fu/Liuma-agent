@@ -1,0 +1,12 @@
+logzero==1.5.*
+adbutils>=0.8.1,<1.0
+tornado
+requests
+apkutils2
+uiautomator2>=2.5.9
+humanize
+tornado
+tidevice
+httpx
+weditor
+
