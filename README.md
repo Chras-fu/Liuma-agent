@@ -13,6 +13,8 @@
 
 如果本项目对您有帮助，请给我们一个Star，您的支持是我们前进的动力。
 
+注明: 设备挂载项目主要参考ATX组织的atx-server2，在一些继承的代码文件中有标明，更多内容请参考: [openATX](https://github.com/openatx/atxserver2)
+
 ## 二、功能介绍
 
 ![system](https://user-images.githubusercontent.com/96771570/221833391-9d35308a-3f90-47c7-9e9d-e62fc1201f18.png)
@@ -54,7 +56,7 @@
 
 IDE推荐: python使用pyCharm
 
-1. 设备代理启动
+1. 项目启动
 ```
 Step1: 安装依赖包 pip3 install -r requirements.txt
 
