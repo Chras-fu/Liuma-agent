@@ -13,15 +13,14 @@
 
 如果本项目对您有帮助，请给我们一个Star，您的支持是我们前进的动力。
 
-
 ## 二、功能介绍
 
-![system](https://user-images.githubusercontent.com/96771570/182859649-bf10af76-16ce-4961-bab6-a8ec36111daa.png)
+![system](https://user-images.githubusercontent.com/96771570/221833391-9d35308a-3f90-47c7-9e9d-e62fc1201f18.png)
 
 1. API测试
 ```
 (1) 支持单接口测试和链路测试。
-(2) 支持接口统一管理，支持swagger导入。
+(2) 支持接口统一管理，支持postman/swagger导入。
 (3) 支持一键生成字段校验的接口健壮性用例。
 (4) 支持全局变量、关联、断言、内置函数、自定义函数。
 (5) 支持前后置脚本、失败继续、超时时间、等待/条件/循环等逻辑控制器。
@@ -37,7 +36,7 @@
 (5) 支持与API用例在同一用例集合顺序执行。
 ```
 
-3. AppUI测试(1.1版本上线)
+3. AppUI测试
 ```
 (1) 支持WebUI同等用例编写和执行能力
 (2) 支持安卓和苹果系统
@@ -51,34 +50,39 @@
 
 ## 三、开发环境
 
-环境依赖: Python3.6+、Chrome、ChromeDriver(参考:[驱动说明](./browser/readme.md))
+环境依赖: Python3.8、nodejs14
 
 IDE推荐: python使用pyCharm
 
-1. 引擎启动
+1. 设备代理启动
 ```
 Step1: 安装依赖包 pip3 install -r requirements.txt
 
-Step2: 流马测试平台->引擎管理->注册引擎 保存engine-code和engine-secret
+Step2: 修改/config/config.ini文件中Platform->url为后端地址
 
-Step3: engine-code和engine-secret填写在/config/config.ini文件中对应位置
+Step3: 修改/config/config.ini文件中Provider->host为本机IP
 
-Step4: 修改/config/config.ini文件中Platform->url为后端地址
+Step4: 修改/config/config.ini文件中StartParam是否启用安卓/苹果设备挂载
 
-Step5: 如linux启动，修改/config/config.ini文件中WebDriver->options为headless
+Step5: 如挂载苹果设备 win电脑需要安装iTunes 且手机预安装WDA并填写wda-bundle-id
 
-Step6: 如linux/mac启动，修改/config/config.ini文件中WebDriver->path为chromedriver
+Step6: owner填写平台用户账号和project填写项目名 默认system为所有项目所有人共享设备
 
-Step7: 启动引擎 python3 startup.py
+Step7: 电脑usb连接手机后 启动代理 python3 startup.py
 ```
 
 2. 验证启动
 
-平台引擎管理查看自己的引擎，显示在线，证明启动成功。再编写一个简单的接口用例并执行，执行成功并返回报告，引擎注册完成。
+平台设备管理查看自己的设备，显示在线，证明启动成功。
+注意: 
+```
+① 本地挂载的设备仅限同一网络下的人或引擎可以在线操作执行测试，且不能在结束使用后自动重置。
+② 如需长期挂载，需要保证后端服务可以访问挂载设备的主机网络或该主机有公网IP
+```
 
 ## 四、容器部署
 
-容器部署请参考: [部署手册](https://docs.qq.com/doc/p/c989fa8bf467eca1a1e0fa59b32ceab017407168)
+设备代理项目暂不支持容器部署，秉持着服务于中小企业的原则，利用闲散设备即插即用进行app测试，而不是搭载大型云真机集群。
 
 
 ## 五、关于我们
