@@ -5,8 +5,9 @@ import subprocess
 import sys
 import traceback
 import zipfile
+
+import requests
 import uiautomator2
-import xml.dom.minidom
 from adbutils import adb as adbclient
 from logzero import logger
 import apkutils2 as apkutils
@@ -60,6 +61,8 @@ class AndroidDevice(object):
 
     async def start_server(self):
         """启动scrcpy服务"""
+        if self._scrcpy_server:
+            self._scrcpy_server.terminate()
         self._scrcpy_server_port = self._free_port.get()
         self._scrcpy_server = subprocess.Popen([
             sys.executable, "-u", "android/proxy_scrcpy.py",
@@ -219,9 +222,13 @@ class AndroidDevice(object):
         device = uiautomator2.Device(self._serial)
         current = device.app_current()
         size = device.window_size()
-        page_xml = device.dump_hierarchy(pretty=True)
-        page_json = uidumplib.android_hierarchy_to_json(
-            page_xml.encode('utf-8'))
+        atx_agent_url = "http://" + self.addrs.get("atxAgentAddress")
+        try:
+            res = requests.get(atx_agent_url+"/dump/hierarchy")
+            page_xml = res.json()["result"]
+        except:
+            page_xml = device.dump_hierarchy(pretty=True)
+        page_json = uidumplib.android_hierarchy_to_json(page_xml.encode('utf-8'))
         return {
             "jsonHierarchy": page_json,
             "activity": current['activity'],
