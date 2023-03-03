@@ -13,6 +13,8 @@ from tornado import gen, httpclient
 from tools.config import config
 
 
+DEVICES = dict()
+
 async def heartbeat_connect(server_url, system):
     addr = server_url.replace("http://", "").replace("/", "")
     ws_url = f"ws://{addr}/websocket/heartbeat?project={config.project}&owner={config.owner}"
@@ -47,13 +49,13 @@ class HeartbeatConnection(object):
             message = await self._queue.get()
             if message is None:
                 logger.info("Resent messages: %s", self._db)
-                for _, v in self._db.items():
+                for v in self._db.values():
                     await self._ws.write_message(v)
                 continue
 
-            if 'udid' in message:  # ping消息不包含在裡面
-                udid = message['udid']
-                update_recursive(self._db, {udid: message})
+            if 'serial' in message:  # ping消息不包含在裡面
+                serial = message['serial']
+                update_recursive(self._db, {serial: message})
             self._queue.task_done()
 
             if self._ws:
@@ -66,27 +68,47 @@ class HeartbeatConnection(object):
     async def _drain_ws_message(self):
         while True:
             message = await self._ws.read_message()
-            logger.debug("WS read message: %s", message)
-            if message is None:
+            logger.info("WS receive message: %s", message)
+            if message is None: # 连接关闭重新连接
                 self._ws = None
                 logger.warning("WS closed")
                 self._ws = await self.connect()
                 await self._queue.put(None)
-            logger.info("WS receive message: %s", message)
+            elif message.startswith("cold@"): # 冷却设备
+                serial = message[5:]
+                try:
+                    await self.cold_device(message[5:])
+                    logger.info(f"{self._system} device:{serial} cold success")
+                except Exception as e:
+                    logger.info(f"{self._system} device:{serial} cold error: {str(e)}")
 
-    async def connect(self):
-        cnt = 0
-        while True:
+    async def cold_device(self, serial):
+        if serial not in DEVICES:
+            return
+        device = DEVICES[serial]
+        if self._system == "Android":
+            await device.reset()
+            await self.device_update({
+                "command": "init",
+                "serial": serial,
+                "agent": device.addrs,
+                "properties": await device.properties()
+            })
+        else:
+            device.restart_wda_proxy()
+            await device.wda_healthcheck()
+
+    async def connect(self, cnt=0):
+        while cnt < 30:
             try:
                 ws = await self._connect()
-                cnt = 0
                 return ws
             except Exception as e:
-                cnt = min(30, cnt + 1)
-                if cnt == 0:
-                    logger.warning("连接流马失败 请检查平台地址、项目名称以及用户账号是否配置正确")
-                logger.warning("WS connect error: %s, reconnect after %ds", e, cnt + 1)
-                await gen.sleep(cnt + 1)
+                cnt += 1
+                logger.warning("WS connect error: %s, reconnect after %ds", str(e), cnt+1)
+                await gen.sleep(cnt+1)
+        else:
+            logger.warning("连接流马失败 请检查平台地址、项目名称以及用户账号是否配置正确")
 
     async def _connect(self):
         request = httpclient.HTTPRequest(self._server_ws_url, validate_cert=False)

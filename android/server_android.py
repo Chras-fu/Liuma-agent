@@ -7,29 +7,26 @@ import json
 import os
 import re
 import shutil
-import subprocess
 import time
 import traceback
-from concurrent.futures import ThreadPoolExecutor
 import requests
 import tornado.web
-from logzero import logger
+import tornado.websocket
 from tornado.concurrent import run_on_executor
 from tornado.ioloop import IOLoop
-import tornado.websocket
-
-import adbutils
-from adbutils import adb as adbclient
+from adbutils import adb as adbclient, errors
 from tornado.log import enable_pretty_logging
-
-from tools.freeport import FreePort
+from concurrent.futures import ThreadPoolExecutor
+from logzero import logger
 from android.adb import adb
 from android.device_android import AndroidDevice
+from tools.freeport import FreePort
 from tools.config import config
-from tools import heartbeat, download
+from tools.download import get_all
+from tools.heartbeat import heartbeat_connect, HeartbeatConnection, DEVICES
 
-HBC_ANDROID = heartbeat.HeartbeatConnection()
-DEVICES_ANDROID = dict()
+
+HBC_ANDROID = HeartbeatConnection()
 FREE_PORT = FreePort("android")
 
 
@@ -91,7 +88,7 @@ class AppInstallHandler(CorsMixin, tornado.web.RequestHandler):
             device.sync.push(apk_path, dst)
             # 调用pm install安装
             device.install_remote(dst)
-        except adbutils.errors.AdbInstallError as e:
+        except errors.AdbInstallError as e:
             return {
                 "status": 1000,
                 "message": "安装失败: \n%s" % e.output
@@ -148,9 +145,9 @@ class DeviceScreenshotHandler(CorsMixin, tornado.web.RequestHandler):
     async def get(self):
         serial = self.get_argument("serial")
         assert serial
-        if serial not in DEVICES_ANDROID:
+        if serial not in DEVICES:
             return
-        device = DEVICES_ANDROID[serial]
+        device = DEVICES[serial]
         try:
             buffer = io.BytesIO()
             device.get_screenshot().convert("RGB").save(buffer, format='JPEG')
@@ -172,33 +169,14 @@ class DeviceHierarchyHandler(CorsMixin, tornado.web.RequestHandler):
     async def get(self):
         serial = self.get_argument("serial")
         assert serial
-        if serial not in DEVICES_ANDROID:
+        if serial not in DEVICES:
             return
-        device = DEVICES_ANDROID[serial]
+        device = DEVICES[serial]
         try:
             hierachy = device.dump_hierarchy()
             self.write({"status": 0, "message": "获取控件成功", "data": hierachy})
         except Exception as e:
             self.write({"status": 1000, "message": "获取控件失败: %s" % str(e)})
-
-
-class ColdingHandler(CorsMixin, tornado.web.RequestHandler):
-    """ 设备清理 """
-    async def post(self):
-        serial = self.get_argument("serial")
-        assert serial
-        logger.info("Receive colding request for %s", serial)
-        if serial not in DEVICES_ANDROID:
-            return
-        device = DEVICES_ANDROID[serial]
-        await device.reset()
-        await HBC_ANDROID.device_update({
-            "command": "init",
-            "serial": serial,
-            "agent": device.addrs,
-            "properties": await device.properties()
-        })
-        self.write({"status": 0, "message": "冷却成功"})
 
 
 def make_app():
@@ -208,7 +186,7 @@ def make_app():
         (r"/app/uninstall", AppUninstallHandler),
         (r"/device/screenshot", DeviceScreenshotHandler),
         (r"/device/hierarchy", DeviceHierarchyHandler),
-        (r"/cold", ColdingHandler),
+        # (r"/cold", ColdingHandler),
     ], **setting)
     return app
 
@@ -226,7 +204,7 @@ async def device_watch():
                 device = AndroidDevice(event.serial, FREE_PORT)
                 await device.init()
                 await device.open_identify()
-                DEVICES_ANDROID[serial] = device
+                DEVICES[serial] = device
                 await HBC_ANDROID.device_update({
                     "command": "init",
                     "serial": serial,
@@ -241,9 +219,9 @@ async def device_watch():
                 import traceback
                 traceback.print_exc()
         else:
-            if serial in DEVICES_ANDROID:
-                DEVICES_ANDROID[serial].close()
-                DEVICES_ANDROID.pop(serial, None)
+            if serial in DEVICES:
+                DEVICES[serial].close()
+                DEVICES.pop(serial, None)
 
             await HBC_ANDROID.device_update({
                 "command": "delete",
@@ -255,10 +233,10 @@ async def async_main():
     enable_pretty_logging()
     app = make_app()
     app.listen(config.android_port)
-    download.get_all()  # 下载安卓所有依赖包
+    get_all()  # 下载安卓所有依赖包
     time.sleep(1)
     # 连接流马
-    conn = await heartbeat.heartbeat_connect(config.url, "Android")
+    conn = await heartbeat_connect(config.url, "Android")
     global HBC_ANDROID
     HBC_ANDROID = conn
     await device_watch()

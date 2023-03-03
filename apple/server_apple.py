@@ -1,8 +1,6 @@
 # coding: utf-8
 # copyright by codeskyblue of openATX
 
-from __future__ import print_function
-
 import base64
 import hashlib
 import io
@@ -12,8 +10,6 @@ import shutil
 import subprocess
 import time
 import traceback
-from concurrent.futures import ThreadPoolExecutor
-
 import requests
 import tornado.web
 from logzero import logger
@@ -21,15 +17,14 @@ from tornado import locks
 from tornado.concurrent import run_on_executor
 from tornado.ioloop import IOLoop
 from tornado.log import enable_pretty_logging
-
-from tools import heartbeat
+from concurrent.futures import ThreadPoolExecutor
 from apple import device_apple
 from apple.idb import idb
 from tools.freeport import FreePort
 from tools.config import config
+from tools.heartbeat import heartbeat_connect, HeartbeatConnection, DEVICES
 
-HBC_IOS = heartbeat.HeartbeatConnection()
-DEVICE_IOS = dict()
+HBC_IOS = HeartbeatConnection()
 FREE_PORT = FreePort("apple")
 
 
@@ -147,9 +142,9 @@ class DeviceScreenshotHandler(CorsMixin, tornado.web.RequestHandler):
     async def get(self):
         serial = self.get_argument("serial")
         assert serial
-        if serial not in DEVICE_IOS:
+        if serial not in DEVICES:
             return
-        device = DEVICE_IOS[serial]
+        device = DEVICES[serial]
         try:
             buffer = io.BytesIO()
             device.get_screenshot().convert("RGB").save(buffer, format='JPEG')
@@ -171,28 +166,14 @@ class DeviceHierarchyHandler(CorsMixin, tornado.web.RequestHandler):
     async def get(self):
         serial = self.get_argument("serial")
         assert serial
-        if serial not in DEVICE_IOS:
+        if serial not in DEVICES:
             return
-        device = DEVICE_IOS[serial]
+        device = DEVICES[serial]
         try:
             hierachy = device.dump_hierarchy()
             self.write({"status": 0, "message": "获取控件成功", "data": hierachy})
         except Exception as e:
             self.write({"status": 1000, "message": "获取控件失败: %s" % str(e)})
-
-
-class ColdingHandler(CorsMixin, tornado.web.RequestHandler):
-    """ 设备清理 """
-    async def post(self):
-        serial = self.get_argument('serial')
-        assert serial
-        logger.info("Receive colding request for %s", serial)
-        if serial not in DEVICE_IOS:
-            return
-        device = DEVICE_IOS[serial]
-        device.restart_wda_proxy()
-        await device.wda_healthcheck()
-        self.write({"status": 0, "message": "冷却成功"})
 
 
 def make_app():
@@ -202,7 +183,6 @@ def make_app():
         (r"/app/uninstall", AppUnInstallHandler),
         (r"/device/screenshot", DeviceScreenshotHandler),
         (r"/device/hierarchy", DeviceHierarchyHandler),
-        (r"/cold", ColdingHandler),
     ], **setting)
 
 
@@ -235,11 +215,11 @@ async def device_watch():
         if event.present:
             d = device_apple.WDADevice(event.serial, wda_bundle_id=wda_bundle_id,
                                        free_port=FREE_PORT, lock=lock, callback=_device_callback)
-            DEVICE_IOS[event.serial] = d
+            DEVICES[event.serial] = d
             d.start()
         else:  # offline
-            await DEVICE_IOS[event.serial].stop()
-            DEVICE_IOS.pop(event.serial)
+            await DEVICES[event.serial].stop()
+            DEVICES.pop(event.serial)
 
 
 async def async_main():
@@ -247,7 +227,7 @@ async def async_main():
     app = make_app()
     app.listen(config.apple_port)
     # 连接流马
-    conn = await heartbeat.heartbeat_connect(config.url, "Apple")
+    conn = await heartbeat_connect(config.url, "Apple")
     global HBC_IOS
     HBC_IOS = conn
     time.sleep(1)
@@ -260,6 +240,6 @@ def start_apple():
         IOLoop.current().run_sync(async_main)
     except KeyboardInterrupt:
         IOLoop.instance().stop()
-        for d in DEVICE_IOS.values():
+        for d in DEVICES.values():
             d.destroy()
 
