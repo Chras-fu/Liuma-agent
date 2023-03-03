@@ -7,8 +7,8 @@ import tornado.web
 import tornado.netutil
 import tornado.process
 
-from android.scrcpy.client import ClientDevice
-from android.scrcpy.constants import sc_control_msg_type
+from scrcpy.client import ClientDevice
+from scrcpy.constants import sc_control_msg_type
 
 DEVICE_ID = None
 H264_HEADER = []

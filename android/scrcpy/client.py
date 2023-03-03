@@ -2,7 +2,7 @@ import struct
 import asyncio
 import subprocess
 
-from android.scrcpy.controller import Controller
+from scrcpy.controller import Controller
 from logzero import logger
 
 

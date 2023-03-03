@@ -1,7 +1,7 @@
 import asyncio
 import struct
-from android.scrcpy.constants import sc_control_msg_type
-from android.scrcpy.constants.input import android_motionevent_action, android_motionevent_buttons
+from scrcpy.constants import sc_control_msg_type
+from scrcpy.constants.input import android_motionevent_action, android_motionevent_buttons
 
 
 class Controller:
