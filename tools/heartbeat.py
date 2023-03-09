@@ -3,6 +3,8 @@
 
 import collections
 import json
+import urllib
+from asyncio import sleep
 from collections import defaultdict
 
 from logzero import logger
@@ -15,12 +17,13 @@ from tools.config import config
 
 DEVICES = dict()
 
+
 async def heartbeat_connect(server_url, system):
     if server_url.startswith("https"):
         addr = server_url.replace("/", "").replace("https:", "wss://")
     else:
         addr = server_url.replace("/", "").replace("http:", "ws://")
-    ws_url = f"{addr}/websocket/heartbeat?project={config.project}&owner={config.owner}"
+    ws_url = f"{addr}/websocket/heartbeat?project={urllib.parse.quote(config.project)}&owner={config.owner}"
     hbc = HeartbeatConnection(ws_url, system)
     await hbc.open()
     return hbc
@@ -46,6 +49,12 @@ class HeartbeatConnection(object):
         self._ws = await self.connect()
         IOLoop.current().spawn_callback(self._drain_ws_message)
         IOLoop.current().spawn_callback(self._drain_queue)
+        IOLoop.current().spawn_callback(self._ping)
+
+    async def _ping(self):
+        while True:
+            self._ws.ping(bytes(0))
+            await sleep(30)
 
     async def _drain_queue(self):
         while True:
@@ -72,7 +81,7 @@ class HeartbeatConnection(object):
         while True:
             message = await self._ws.read_message()
             logger.info("WS receive message: %s", message)
-            if message is None: # 连接关闭重新连接
+            if message is None:  # 连接关闭重新连接
                 self._ws = None
                 logger.warning("WS closed")
                 self._ws = await self.connect()
