@@ -16,8 +16,11 @@ from tools.config import config
 DEVICES = dict()
 
 async def heartbeat_connect(server_url, system):
-    addr = server_url.replace("http://", "").replace("/", "")
-    ws_url = f"ws://{addr}/websocket/heartbeat?project={config.project}&owner={config.owner}"
+    if server_url.startswith("https"):
+        addr = server_url.replace("/", "").replace("https:", "wss://")
+    else:
+        addr = server_url.replace("/", "").replace("http:", "ws://")
+    ws_url = f"{addr}/websocket/heartbeat?project={config.project}&owner={config.owner}"
     hbc = HeartbeatConnection(ws_url, system)
     await hbc.open()
     return hbc

@@ -32,9 +32,9 @@ FREE_PORT = FreePort("android")
 
 class CorsMixin(object):
     CORS_ORIGIN = '*'
-    CORS_METHODS = 'GET,POST,OPTIONS'
+    CORS_METHODS = '*'
     CORS_CREDENTIALS = True
-    CORS_HEADERS = "x-requested-with,authorization"
+    CORS_HEADERS = "*"
 
     def set_default_headers(self):
         self.set_header("Access-Control-Allow-Origin", self.CORS_ORIGIN)
