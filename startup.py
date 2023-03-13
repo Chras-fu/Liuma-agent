@@ -8,8 +8,12 @@ from android.server_android import start_android
 from logzero import logger
 
 
+__version__ = "1.1.1"
+
+
 def startup():
     """启动服务"""
+    logger.info("Liuma-agent Version: %s", __version__)
     logger.info("本机设备所属流马项目: %s", config.project)
     logger.info("本机设备所属流马账号: %s", config.owner)
     # 启动设备监听 android和apple独立进程
