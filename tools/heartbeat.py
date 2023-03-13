@@ -53,7 +53,10 @@ class HeartbeatConnection(object):
 
     async def _ping(self):
         while True:
-            self._ws.ping(bytes(0))
+            try:
+                self._ws.ping(bytes(0))
+            except:
+                pass
             await sleep(30)
 
     async def _drain_queue(self):
