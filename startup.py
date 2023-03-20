@@ -8,7 +8,7 @@ from android.server_android import start_android
 from logzero import logger
 
 
-__version__ = "1.1.1"
+__version__ = "1.2.0"
 
 
 def startup():
