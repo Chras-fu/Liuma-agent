@@ -68,7 +68,7 @@ class AndroidDevice(object):
             sys.executable, "-u", "android/proxy_scrcpy.py",
             "-s", self._serial,
             "-sp", str(self._scrcpy_server_port)],
-            stdout=sys.stdout)
+            stdout=subprocess.DEVNULL)
         logger.info("[%s] scrcpy server start, port %s" % (self._serial, self._scrcpy_server_port))
 
     def _init_binaries(self):
@@ -130,8 +130,12 @@ class AndroidDevice(object):
         """代理手机端口"""
         logger.debug("%s forward atx-agent", self)
         self._atx_proxy_port = await self.proxy_device_port(7912)
-        logger.debug("%s forward whatsinput", self)
         self._whatsinput_port = await self.proxy_device_port(6677)
+
+        port = self._adb_remote_port = self._free_port.get()
+        logger.debug("%s adbkit start, port %d", self, port)
+        self.run_background(['node', 'node_modules/adbkit/bin/adbkit', 'usb-device-to-tcp', '-p',
+                            str(self._adb_remote_port), self._serial], silent=True)
 
     async def adb_forward_to_any(self, remote: str) -> int:
         async for f in adb.forward_list():
@@ -146,7 +150,11 @@ class AndroidDevice(object):
     async def proxy_device_port(self, device_port: int) -> int:
         """ reverse-proxy device:port to *:port """
         local_port = await self.adb_forward_to_any("tcp:" + str(device_port))
-        return local_port
+        listen_port = self._free_port.get()
+        logger.debug("%s tcpproxy.js start *:%d -> %d", self, listen_port,local_port)
+        self.run_background(['node', 'android/js/tcpproxy.js', str(listen_port), 'localhost',
+                            str(local_port)], silent=True)
+        return listen_port
 
     @property
     def addrs(self):
@@ -156,6 +164,7 @@ class AndroidDevice(object):
         return {
             "url": "http://" + port2addr(config.android_port),
             "atxAgentAddress": port2addr(self._atx_proxy_port),
+            "remoteConnectAddress": port2addr(self._adb_remote_port),
             "whatsInputAddress": port2addr(self._whatsinput_port),
             "scrcpyServerAddress": port2addr(self._scrcpy_server_port)
         }

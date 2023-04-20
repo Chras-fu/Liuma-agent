@@ -57,7 +57,7 @@ class ClientDevice:
             "app_process",
             "/",
             "com.genymobile.scrcpy.Server",
-            "1.25",  # Scrcpy server version
+            "1.24",  # Scrcpy server version
             f"log_level=info",  # Log level: info, verbose...
             f"max_size={self.max_size}",  # Max screen width (long side)
             f"bit_rate={self.bit_rate}",  # Bitrate of video
@@ -85,7 +85,6 @@ class ClientDevice:
         if len(res) == 1 and "Device" in res[0].decode():
             logger.info("[%s] start scrcpy success" % self.device_id)
         else:
-            logger.info("[%s] start scrcpy failed" % self.device_id)
             self.deploy_shell_socket = None
             for ws_client in self.ws_client_list:
                 await ws_client.write_message("启动scrcpy服务失败")
@@ -113,9 +112,7 @@ class ClientDevice:
                 current_nal_data = b'\x00\x00\x00\x01' + data.rstrip(b'\x00\x00\x00\x01')
                 for ws_client in self.ws_client_list:
                     await ws_client.write_message(current_nal_data, True)
-            except (asyncio.exceptions.IncompleteReadError, AttributeError) as e:
-                for ws_client in self.ws_client_list:
-                    await ws_client.write_message("Scrcpy服务异常 请刷新页面")
+            except (asyncio.streams.IncompleteReadError, AttributeError):
                 break
 
     async def start(self):

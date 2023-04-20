@@ -17,7 +17,7 @@ SOCKET_SERVER = None
 SOCKET_CLIENT = None
 
 
-class ScrcpyWSHandler(websocket.WebSocketHandler):
+class ScreenWSHandler(websocket.WebSocketHandler):
     """scrcpy投屏"""
     DEVICE_CLIENT_DICT = dict()
 
@@ -74,7 +74,7 @@ def start_server():
     DEVICE_ID = args.serial
 
     app = tornado.web.Application([
-        (r"/screen", ScrcpyWSHandler),
+        (r"/screen", ScreenWSHandler),
     ], debug=False)
 
     http_server = httpserver.HTTPServer(app)
