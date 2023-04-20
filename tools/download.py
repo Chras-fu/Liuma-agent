@@ -47,10 +47,10 @@ def get_whatsinput_apk() -> str:
 def get_scrcpy_server() -> str:
     """下载scrcpy文件"""
     download_path = f"vendor/scrcpy-server"
-    target_path = f"vendor/scrcpy-server-1.24.zip"
+    target_path = f"vendor/scrcpy-server-1.25.zip"
     if not os.path.exists(target_path):
         mirror_download(
-            f"https://github.com/Genymobile/scrcpy/releases/download/v1.24/scrcpy-server-v1.24",
+            f"https://github.com/Genymobile/scrcpy/releases/download/v1.25/scrcpy-server-v1.25",
             download_path)
 
         zp = zipfile.ZipFile(target_path, 'a', zipfile.ZIP_STORED)
