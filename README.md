@@ -52,7 +52,7 @@
 
 ## 三、开发环境
 
-环境依赖: Python3.8、nodejs14
+环境依赖: Python3.8
 
 IDE推荐: python使用pyCharm
 
@@ -60,19 +60,17 @@ IDE推荐: python使用pyCharm
 ```
 Step1: 安装python依赖包 pip3 install -r requirements.txt
 
-Step2: 安装node依赖包 npm install
+Step2: 修改/config/config.ini文件中Platform->url为后端地址
 
-Step3: 修改/config/config.ini文件中Platform->url为后端地址
+Step3: 修改/config/config.ini文件中Provider->host为本机IP
 
-Step4: 修改/config/config.ini文件中Provider->host为本机IP
+Step4: 修改/config/config.ini文件中StartParam是否启用安卓/苹果设备挂载
 
-Step5: 修改/config/config.ini文件中StartParam是否启用安卓/苹果设备挂载
+Step5: 如挂载苹果设备 win电脑需要安装iTunes 且手机预安装WDA并填写wda-bundle-id
 
-Step6: 如挂载苹果设备 win电脑需要安装iTunes 且手机预安装WDA并填写wda-bundle-id
+Step6: owner填写平台用户账号和project填写项目名 默认system为所有项目所有人共享设备
 
-Step7: owner填写平台用户账号和project填写项目名 默认system为所有项目所有人共享设备
-
-Step8: 电脑usb连接手机后 启动代理 python3 startup.py
+Step7: 电脑usb连接手机后 启动代理 python3 startup.py
 ```
 
 2. 验证启动

@@ -1,7 +1,5 @@
 import asyncio
 import struct
-from scrcpy.constants import sc_control_msg_type
-from scrcpy.constants.input import android_motionevent_action, android_motionevent_buttons
 
 
 class Controller:
@@ -17,13 +15,12 @@ class Controller:
 
     async def inject(self, msg):
         async with self.device.device_lock:
-            await self.device.control_socket.write(msg)
+            await self.device.control_socket.write_bytes(msg)
 
     async def inject_without_lock(self, msg):
-        await self.device.control_socket.write(msg)
+        await self.device.control_socket.write_bytes(msg)
 
-    async def inject_touch_event(self, x, y, action=android_motionevent_action.AMOTION_EVENT_ACTION_DOWN, touch_id=-1,
-                           pressure=0xFFFF, buttons=android_motionevent_buttons.AMOTION_EVENT_BUTTON_PRIMARY):
+    async def inject_touch_event(self, x, y, action=0, touch_id=-1, pressure=0xFFFF, buttons=1 << 0):
         """
         action: android_motionevent_action
         touch_id: touch_id use to distinguish multi touch
@@ -31,21 +28,21 @@ class Controller:
         buttons: android_motionevent_buttons
         inject_data: lens 28
         """
-        if action == android_motionevent_action.AMOTION_EVENT_ACTION_UP:
+        if action == 1:
             pressure = 0x0
-        msg_type = sc_control_msg_type.SC_CONTROL_MSG_TYPE_INJECT_TOUCH_EVENT
+        msg_type = 2
         x, y = max(x*self.device.resolution[0], 0), max(y*self.device.resolution[1], 0)
         inject_data = struct.pack(">BBqiiHHHi", msg_type, action, touch_id, int(x), int(y),
                                   int(self.device.resolution[0]), int(self.device.resolution[1]), pressure, buttons)
         await self.inject(inject_data)
         return inject_data
 
-    async def inject_scroll_event(self, x, y, distance_x, distance_y, buttons=android_motionevent_buttons.AMOTION_EVENT_BUTTON_PRIMARY):
+    async def inject_scroll_event(self, x, y, distance_x, distance_y, buttons=1 << 0):
         """
         buttons: android_motionevent_buttons
         inject_data: lens 25
         """
-        msg_type = sc_control_msg_type.SC_CONTROL_MSG_TYPE_INJECT_SCROLL_EVENT
+        msg_type = 3
         x, y = max(x*self.device.resolution[0], 0), max(y*self.device.resolution[1], 0)
         inject_data = struct.pack(">BiiHHiii", msg_type, int(x), int(y), int(self.device.resolution[0]),
                                   int(self.device.resolution[1]), int(distance_x), int(distance_y), buttons)
@@ -72,7 +69,7 @@ class Controller:
                 break
             step += 1
         unit_delay = delay/step
-        await self.inject_touch_event(x, y, android_motionevent_action.AMOTION_EVENT_ACTION_DOWN)
+        await self.inject_touch_event(x, y, 0)
         while True:
             if x > end_x:
                 x -= min(x-end_x, unit)
@@ -82,9 +79,9 @@ class Controller:
                 y -= min(y-end_y, unit)
             elif y < end_y:
                 y += min(end_y-y, unit)
-            await self.inject_touch_event(x, y, android_motionevent_action.AMOTION_EVENT_ACTION_MOVE)
+            await self.inject_touch_event(x, y, 2)
             await asyncio.sleep(unit_delay)
             if x == end_x and y == end_y:
-                await self.inject_touch_event(x, y, android_motionevent_action.AMOTION_EVENT_ACTION_UP)
+                await self.inject_touch_event(x, y, 1)
                 break
 

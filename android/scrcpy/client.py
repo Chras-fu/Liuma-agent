@@ -1,9 +1,12 @@
 import struct
 import asyncio
 import subprocess
-
+from bitstring import BitStream
+from h26x_extractor.nalutypes import SPS
 from scrcpy.controller import Controller
 from logzero import logger
+
+from android.adb import adb
 
 
 class ClientDevice:
@@ -25,7 +28,7 @@ class ClientDevice:
     def __init__(self, device_id,
                  max_size=720,
                  bit_rate=1280000,
-                 max_fps=30,
+                 max_fps=25,
                  connect_timeout=300):
         self.device_id = device_id
         # scrcpy_server启动参数
@@ -49,6 +52,8 @@ class ClientDevice:
         self.controller = Controller(self)
         # 需要推流得ws_client
         self.ws_client_list = list()
+        # 需要推操作失败的ws_client
+        self.ws_touch_list = list()
 
     async def prepare_server(self):
         commands2 = [
@@ -85,9 +90,9 @@ class ClientDevice:
         if len(res) == 1 and "Device" in res[0].decode():
             logger.info("[%s] start scrcpy success" % self.device_id)
         else:
+            logger.info("[%s] start scrcpy error" % self.device_id)
             self.deploy_shell_socket = None
             for ws_client in self.ws_client_list:
-                await ws_client.write_message("启动scrcpy服务失败")
                 ws_client.close()
             raise ConnectionError("启动scrcpy服务失败")
 
@@ -108,12 +113,27 @@ class ClientDevice:
     async def _video_task(self):
         while True:
             try:
-                data = await self.video_socket.read_until(b'\x00\x00\x00\x01')
+                data = await self.video_socket.read_bytes_until(b'\x00\x00\x00\x01', None)
                 current_nal_data = b'\x00\x00\x00\x01' + data.rstrip(b'\x00\x00\x00\x01')
+                self.update_resolution(current_nal_data)
                 for ws_client in self.ws_client_list:
                     await ws_client.write_message(current_nal_data, True)
-            except (asyncio.streams.IncompleteReadError, AttributeError):
+            except:
+                logger.info("[%s] scrcpy error" % self.device_id)
                 break
+
+    def update_resolution(self, current_nal_data):
+        # when read a sps frame, change origin resolution
+        if current_nal_data.startswith(b'\x00\x00\x00\x01g'):
+            # sps resolution not equal device resolution, so reuse and transform original resolution
+            sps = SPS(BitStream(current_nal_data[5:]), False)
+            width = (sps.pic_width_in_mbs_minus_1 + 1) * 16
+            height = (2 - sps.frame_mbs_only_flag) * (sps.pic_height_in_map_units_minus_1 + 1) * 16
+            if width > height:
+                resolution = (max(self.resolution), min(self.resolution))
+            else:
+                resolution = (min(self.resolution), max(self.resolution))
+            self.resolution = resolution
 
     async def start(self):
         await self.prepare_server()
@@ -138,56 +158,18 @@ class ClientDevice:
             self.deploy_shell_socket = None
 
     async def create_socket(self, connect_name, timeout=300):
-        socket = ClientSocket(self.device_id)
+        socket = adb.connect()
         for _ in range(timeout):
             try:
-                await socket.connect()
-                await socket.write(socket.cmd_format(f'host:transport:{self.device_id}'))
-                assert await socket.read_exactly(4) == b'OKAY'
-                await socket.write(socket.cmd_format(connect_name))
-                assert await socket.read_exactly(4) == b'OKAY'
+                socket = await socket.connect()
+                await socket.send_cmd(f'host:transport:{self.device_id}')
+                await socket.check_okay()
+                await socket.send_cmd(connect_name)
+                await socket.check_okay()
                 return socket
             except:
                 await socket.disconnect()
             await asyncio.sleep(0.01)
         else:
             raise ConnectionError(f"{self.device_id} create_connection to {connect_name} error!!")
-
-
-class ClientSocket:
-    """客户端连接"""
-    @classmethod
-    def cmd_format(cls, cmd):
-        return "{:04x}{}".format(len(cmd), cmd).encode("utf-8")
-
-    def __init__(self, device_id, socket_timeout=1):
-        self.device_id = device_id
-        self.socket_timeout = socket_timeout
-        self.reader = None
-        self.writer = None
-
-    async def connect(self):
-        try:
-            self.reader, self.writer = await asyncio.wait_for(asyncio.open_connection("127.0.0.1", "5037"), self.socket_timeout)
-        except:
-            await self.disconnect()
-
-    async def read_exactly(self, cnt):
-        return await self.reader.readexactly(cnt)
-
-    async def read_until(self, sep):
-        return await self.reader.readuntil(sep)
-
-    async def write(self, data):
-        self.writer.write(data)
-        await self.writer.drain()
-
-    async def disconnect(self):
-        if self.writer:
-            self.writer.close()
-            try:
-                await self.writer.wait_closed()
-            except ConnectionAbortedError:
-                pass
-            self.writer = self.reader = None
 

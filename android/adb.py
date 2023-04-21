@@ -35,25 +35,31 @@ class AdbStreamConnection(tornado.iostream.IOStream):
         self.__host = host
         self.__port = port
         self.__stream = None
+        tornado.iostream.BaseIOStream.__init__(self)
 
     @property
     def stream(self):
         return self.__stream
 
     async def send_cmd(self, cmd: str):
-        await self.stream.write("{:04x}{}".format(len(cmd),
-                                                  cmd).encode('utf-8'))
+        await self.stream.write("{:04x}{}".format(len(cmd), cmd).encode('utf-8'))
 
-    async def read_bytes(self, num: int):
-        return (await self.stream.read_bytes(num)).decode()
+    async def write_bytes(self, msg: bytes):
+        await self.stream.write(msg)
+
+    async def read_exactly(self, num:int):
+        return await self.stream.read_bytes(num)
+
+    async def read_bytes_until(self, delimiter: bytes, max_bytes: int):
+        return await self.stream.read_until(delimiter, max_bytes)
 
     async def read_string(self):
-        lenstr = await self.read_bytes(4)
+        lenstr = (await self.read_exactly(4)).decode()
         msgsize = int(lenstr, 16)
-        return await self.read_bytes(msgsize)
+        return (await self.read_exactly(msgsize)).decode()
 
     async def check_okay(self):
-        data = await self.read_bytes(4)
+        data = (await self.read_exactly(4)).decode()
         if data == FAIL:
             raise AdbError(await self.read_string())
         elif data == OKAY:
@@ -62,13 +68,14 @@ class AdbStreamConnection(tornado.iostream.IOStream):
             raise AdbError("Unknown data: %s" % data)
 
     async def connect(self):
-        adb_host = self.__host or os.environ.get(
-            "ANDROID_ADB_SERVER_HOST", "127.0.0.1")
-        adb_port = self.__port or int(os.environ.get(
-            "ANDROID_ADB_SERVER_PORT", 5037))
-        stream = await TCPClient().connect(adb_host, adb_port)
+        stream = await TCPClient().connect(self.__host, self.__port)
         self.__stream = stream
         return self
+
+    async def disconnect(self):
+        if self.__stream:
+            self.__stream.close()
+            self.__stream = None
 
     async def __aenter__(self):
         return await self.connect()
@@ -78,10 +85,8 @@ class AdbStreamConnection(tornado.iostream.IOStream):
 
 
 class AdbClient(object):
-    def __init__(self):
-        self._stream = None
 
-    def connect(self, host=None, port=None) -> AdbStreamConnection:
+    def connect(self, host="127.0.0.1", port=5037) -> AdbStreamConnection:
         return AdbStreamConnection(host, port)
 
     async def server_version(self) -> int:

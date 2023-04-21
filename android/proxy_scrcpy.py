@@ -8,7 +8,6 @@ import tornado.netutil
 import tornado.process
 
 from scrcpy.client import ClientDevice
-from scrcpy.constants import sc_control_msg_type
 
 DEVICE_ID = None
 H264_HEADER = []
@@ -17,7 +16,7 @@ SOCKET_SERVER = None
 SOCKET_CLIENT = None
 
 
-class ScreenWSHandler(websocket.WebSocketHandler):
+class ScrcpyWSHandler(websocket.WebSocketHandler):
     """scrcpy投屏"""
     DEVICE_CLIENT_DICT = dict()
 
@@ -35,29 +34,35 @@ class ScreenWSHandler(websocket.WebSocketHandler):
             self.device_client = old_device_client
         else:
             self.device_client = self.DEVICE_CLIENT_DICT[self.device_id] = ClientDevice(self.device_id)
-        self.device_client.ws_client_list.append(self)
-        # 重新启动scrcpy 重新开始任务
-        async with self.device_client.device_lock:
-            await self.device_client.stop()
-            await self.device_client.start()
+        if "screen" in self.request.path:
+            self.device_client.ws_client_list.append(self)
+            # 重新启动scrcpy 重新开始任务
+            async with self.device_client.device_lock:
+                await self.device_client.stop()
+                await self.device_client.start()
+        else:
+            self.device_client.ws_touch_list.append(self)
 
     async def on_message(self, text_data):
         """receive used to control device"""
         data = json.loads(text_data)
         # touch
-        if data['msg_type'] == sc_control_msg_type.SC_CONTROL_MSG_TYPE_INJECT_TOUCH_EVENT:
+        if data['msg_type'] == 2:
             await self.device_client.controller.inject_touch_event(x=data['x'], y=data['y'], action=data['action'])
         # scroll
-        elif data['msg_type'] == sc_control_msg_type.SC_CONTROL_MSG_TYPE_INJECT_SCROLL_EVENT:
+        elif data['msg_type'] == 3:
             await self.device_client.controller.inject_scroll_event(x=data['x'], y=data['y'],
                                                                     distance_x=data['distance_x'], distance_y=data['distance_y'])
         # swipe
-        elif data['msg_type'] == sc_control_msg_type.SC_CONTROL_MSG_TYPE_INJECT_SWIPE_EVENT:
+        elif data['msg_type'] == 30:
             await self.device_client.controller.swipe(x=data['x'], y=data['y'], end_x=data['end_x'], end_y=data['end_y'],
                                                       unit=data['unit'], delay=data['delay'])
 
     def on_connection_close(self):
-        self.device_client.ws_client_list.remove(self)
+        if self in self.device_client.ws_client_list:
+            self.device_client.ws_client_list.remove(self)
+        if self in self.device_client.ws_touch_list:
+            self.device_client.ws_touch_list.remove(self)
 
 
 def start_server():
@@ -74,7 +79,8 @@ def start_server():
     DEVICE_ID = args.serial
 
     app = tornado.web.Application([
-        (r"/screen", ScreenWSHandler),
+        (r"/screen", ScrcpyWSHandler),
+        (r"/touch", ScrcpyWSHandler),
     ], debug=False)
 
     http_server = httpserver.HTTPServer(app)

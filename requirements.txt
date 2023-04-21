@@ -9,4 +9,6 @@ tornado
 tidevice
 httpx
 weditor
+h26x-extractor==0.8.0
+bitstring
 
