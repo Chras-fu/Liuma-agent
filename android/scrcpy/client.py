@@ -5,8 +5,7 @@ from bitstring import BitStream
 from h26x_extractor.nalutypes import SPS
 from scrcpy.controller import Controller
 from logzero import logger
-
-from android.adb import adb
+from adb import adb
 
 
 class ClientDevice:
