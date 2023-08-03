@@ -117,8 +117,8 @@ class AndroidDevice(object):
         try:
             m = apkutils.APK(path).manifest
             info = self._device.package_info(m.package_name)
-            if info and m.version_code == info[
-                    'version_code'] and m.version_name == info['version_name']:
+            if info and m.version_code == info['version_code'] and (
+                    m.version_name == info['version_name'] or info['version_name'] == 'null'):
                 logger.debug("%s already installed %s", self, path)
             else:
                 print(info, ":", m.version_code, m.version_name)
