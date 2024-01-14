@@ -23,7 +23,7 @@ async def heartbeat_connect(server_url, system):
         addr = server_url.replace("/", "").replace("https:", "wss://")
     else:
         addr = server_url.replace("/", "").replace("http:", "ws://")
-    ws_url = f"{addr}/websocket/heartbeat?project={urllib.parse.quote(config.project)}&owner={config.owner}"
+    ws_url = f"{addr}/websocket/agent/heartbeat?project={urllib.parse.quote(config.project)}&owner={config.owner}"
     hbc = HeartbeatConnection(ws_url, system)
     await hbc.open()
     return hbc
